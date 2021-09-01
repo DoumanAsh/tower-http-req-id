@@ -1,5 +1,3 @@
-extern crate alloc;
-
 pub use lolid::Uuid;
 use lolid::Timestamp;
 

@@ -5,7 +5,8 @@ use hyper::Body;
 use core::convert::Infallible;
 use tower::{service_fn, ServiceBuilder, ServiceExt};
 
-const TEST_ID: &str = "俺のidがこんな可愛いわけがない";
+const HEADER_NAME: &str = "x-request-id";
+const TEST_ID: &str = "id";
 
 #[derive(Clone)]
 struct TestGenerator;
@@ -25,7 +26,10 @@ async fn should_insert_static_string() {
                                        Ok::<_, Infallible>(Response::new(id.to_owned()))
                                    }));
 
-    let res = svc.oneshot(Request::new(Body::empty())).await.unwrap().into_body();
+    let res = svc.oneshot(Request::new(Body::empty())).await.unwrap();
+    assert_eq!(res.headers().get(HEADER_NAME).expect("to have request-id header").to_str().unwrap(), TEST_ID);
+
+    let res = res.into_body();
     assert_eq!(TEST_ID, res);
 }
 
@@ -42,8 +46,11 @@ async fn should_insert_uuid_id() {
                                        Ok::<_, Infallible>(Response::new(id.to_string()))
                                    }));
 
-    let res = svc.oneshot(Request::new(Body::empty())).await.unwrap().into_body();
-    assert!(Uuid::parse_str(&res).is_ok())
+    let res = svc.oneshot(Request::new(Body::empty())).await.unwrap();
+    let header_value = Uuid::parse_str(res.headers().get(HEADER_NAME).expect("to have request-id header").to_str().unwrap()).unwrap();
+
+    let res = res.into_body();
+    assert_eq!(res.as_str(), header_value.to_str());
 }
 
 #[cfg(feature = "uuid")]
@@ -59,8 +66,11 @@ async fn should_insert_uuid_as_string_id() {
                                        Ok::<_, Infallible>(Response::new(id.to_owned()))
                                    }));
 
-    let res = svc.oneshot(Request::new(Body::empty())).await.unwrap().into_body();
-    assert!(Uuid::parse_str(&res).is_ok())
+    let res = svc.oneshot(Request::new(Body::empty())).await.unwrap();
+    let header_value = Uuid::parse_str(res.headers().get(HEADER_NAME).expect("to have request-id header").to_str().unwrap()).unwrap();
+
+    let res = res.into_body();
+    assert_eq!(res.as_str(), header_value.to_str());
 }
 
 #[cfg(feature = "uuid")]
@@ -79,9 +89,11 @@ async fn should_not_insert_new_uuid_id_if_header_present() {
 
     let mut req = Request::new(Body::empty());
     req.headers_mut().insert("x-request-id", http::HeaderValue::from_str(&id.to_str()).unwrap());
-    let res = svc.oneshot(req).await.unwrap().into_body();
+    let res = svc.oneshot(req).await.unwrap();
+    let header_value = Uuid::parse_str(res.headers().get(HEADER_NAME).expect("to have request-id header").to_str().unwrap()).unwrap();
+    assert_eq!(id, header_value);
 
-    let res = Uuid::parse_str(&res).expect("to have uuid");
-    assert_eq!(id, res);
+    let res = res.into_body();
+    assert_eq!(id.to_str(), res.as_str());
 }
 
