@@ -57,7 +57,8 @@ use http::{Response, Request};
 use tower_layer::Layer;
 use tower_service::Service;
 
-const HEADER_NAME: &str = "x-request-id";
+///Header name for Request id
+pub const HEADER_NAME: &str = "x-request-id";
 
 #[cfg(feature = "uuid")]
 mod uuid;
