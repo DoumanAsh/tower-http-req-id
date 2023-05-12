@@ -1,19 +1,31 @@
-pub use lolid::Uuid;
-use lolid::Timestamp;
+extern crate std;
 
-use core::sync::atomic::{AtomicU32, Ordering};
+pub use iuuid::Uuid;
+
+use core::sync::atomic::{AtomicU16, Ordering};
+
+#[inline(always)]
+fn now() -> (u64, u32) {
+    let duration = std::time::SystemTime::UNIX_EPOCH.elapsed().expect("To get time");
+    (duration.as_secs(), duration.subsec_nanos())
+}
 
 fn v1(mac: [u8; 6]) -> Uuid {
-    ///Extra guarantee that v1 is unique.
-    ///u32 should take a while to repeat itself.
-    static COUNTER: AtomicU32 = AtomicU32::new(1);
-    let counter = (COUNTER.fetch_add(1, Ordering::SeqCst) & 0xffff) as u16;
+    use iuuid::timestamp::UUID_TICKS_BETWEEN_EPOCHS;
 
-    Uuid::v1(Timestamp::now().set_counter(counter), mac)
+    static COUNTER: AtomicU16 = AtomicU16::new(1);
+
+    let (seconds, nanos) = now();
+    let ticks = UUID_TICKS_BETWEEN_EPOCHS + seconds * 10_000_000 + nanos as u64 / 100;
+
+    let counter = COUNTER.fetch_add(1, Ordering::AcqRel) % (u16::MAX >> 2);
+
+    //v1 is very useful to generate unique uuid among multiple nodes
+    iuuid::Builder::from_rfc4122_timestamp(ticks, counter, &mac).into_uuid()
 }
 
 fn v4(_: [u8; 6]) -> Uuid {
-    Uuid::v4()
+    Uuid::new_v4()
 }
 
 const V1: fn([u8; 6]) -> Uuid = v1;
